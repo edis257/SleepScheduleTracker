@@ -9,7 +9,7 @@ from discord.ext import commands
 from renkochart import renkochart
 
 
-TOKEN = 'MTA4NDM2NTgwODc4NTk1Mjg0OQ.GXcgET.kke0e-Aq6oclswZLx5qH-AaODDB9zy70VLHT2c'
+TOKEN = ''
 
 bot = commands.Bot(command_prefix="!", intents=discord.Intents.all())
 
@@ -49,7 +49,7 @@ async def on_ready():
 @bot.event
 async def on_presence_update(before, after):
     # check if user goes offline or comes back online
-    if before.status != after.status:
+    if before.status != after.status:       
         if before.status in [discord.Status.online, discord.Status.idle, discord.Status.dnd] and after.status == discord.Status.offline:
             user_id = str(after.id)
             username = after.name
@@ -59,8 +59,8 @@ async def on_presence_update(before, after):
                 user_logs = user_logs[0] + f",offline: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
                 cursor.execute("UPDATE user_logs SET logs = ? WHERE user_id = ?", (user_logs, user_id))
                 connection.commit()
+                #print("ON2OFF_LOGS")
             else:
-                # do nothing
                 pass
         elif before.status == discord.Status.offline and after.status in [discord.Status.online, discord.Status.idle, discord.Status.dnd]:
             user_id = str(after.id)
@@ -71,11 +71,13 @@ async def on_presence_update(before, after):
                 user_logs = user_logs[0] + f",online: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
                 cursor.execute("UPDATE user_logs SET logs = ? WHERE user_id = ?", (user_logs, user_id))
                 connection.commit()
+                #print("OFF2ON_LOGS")
             else:
                 # if user logs do not exist, create new row for the user
                 user_logs = f"online: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
                 cursor.execute("INSERT INTO user_logs (user_id, username, logs) VALUES (?, ?, ?)", (user_id, username, user_logs))
                 connection.commit()
+                #print("OFF2ON_NOLOGS")
 
 @bot.tree.command(name="schedule")
 async def greet(interaction: discord.Interaction, user: discord.Member):

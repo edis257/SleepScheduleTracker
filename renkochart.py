@@ -20,11 +20,14 @@ def renkochart(user_id):
     #data_str = "online: 2023-03-01 09:15:00,offline: 2023-03-01 23:30:00,online: 2023-03-02 08:50:00,offline: 2023-03-02 23:15:00,online: 2023-03-03 09:05:00,offline: 2023-03-03 22:45:00,online: 2023-03-04 09:20:00,offline: 2023-03-04 23:00:00,online: 2023-03-05 10:30:00,offline: 2023-03-05 14:30:00,online: 2023-03-05 19:00:00,offline: 2023-03-05 23:00:00,online: 2023-03-06 09:10:00,offline: 2023-03-06 23:10:00,online: 2023-03-07 09:30:00,offline: 2023-03-07 23:20:00,online: 2023-03-08 08:55:00,offline: 2023-03-08 23:05:00,online: 2023-03-09 09:25:00,offline: 2023-03-09 23:15:00,online: 2023-03-10 09:15:00,offline: 2023-03-10 23:00:00,online: 2023-03-11 09:05:00,offline: 2023-03-11 22:50:00,online: 2023-03-12 09:20:00,offline: 2023-03-12 22:55:00,online: 2023-03-13 09:10:00,offline: 2023-03-13 22:45:00,online: 2023-03-14 09:00:00,offline: 2023-03-14 23:00:00"
 
     #print data_str
-    # print("####################")
-    # print(data_str)
-    # print("####################")
+    
 
     data_list = data_str.split(",")
+    
+    #remove dublicates from data_list
+    data_list = list(dict.fromkeys(data_list))
+
+    #print(data_list)
     datetime_list = []
     for d in data_list:
         if d.startswith("online"):
