@@ -2,9 +2,14 @@ import discord
 from discord.ext import commands
 import sqlite3
 from datetime import datetime
+from discord import app_commands
+from discord.ext import commands
+
+#import renkochart.py
+from renkochart import renkochart
 
 
-TOKEN = 'MTA4NDM2NTgwODc4NTk1Mjg0OQ.GKvuXg.8h26f_K1z6YifcatvfwOkLQhYTFZLflPxueFhU'
+TOKEN = ''
 
 bot = commands.Bot(command_prefix="!", intents=discord.Intents.all())
 
@@ -72,6 +77,19 @@ async def on_presence_update(before, after):
                 cursor.execute("INSERT INTO user_logs (user_id, username, logs) VALUES (?, ?, ?)", (user_id, username, user_logs))
                 connection.commit()
 
+@bot.tree.command(name="schedule")
+async def greet(interaction: discord.Interaction, user: discord.Member):
+    #if command is used in channel with id 888888888888888888
+    if interaction.channel_id == 1062174423685287976:
+        await interaction.response.defer() 
+        #run renkochart with userid as input
+        renkochart(user.id)
+        file = discord.File(f"static/images/{user.id}.png", filename="image.png")
+
+        await interaction.followup.send(file=file)
+        
+    else:
+        await interaction.response.send_message("Bad channel", ephemeral=True)
 
 
 #bot run
