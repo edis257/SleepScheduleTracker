@@ -9,7 +9,7 @@ from discord.ext import commands
 from renkochart import renkochart
 
 
-TOKEN = ''
+TOKEN = 'MTA4NDM2NTgwODc4NTk1Mjg0OQ.GXcgET.kke0e-Aq6oclswZLx5qH-AaODDB9zy70VLHT2c'
 
 bot = commands.Bot(command_prefix="!", intents=discord.Intents.all())
 
@@ -83,10 +83,16 @@ async def greet(interaction: discord.Interaction, user: discord.Member):
     if interaction.channel_id == 1062174423685287976:
         await interaction.response.defer() 
         #run renkochart with userid as input
-        renkochart(user.id)
-        file = discord.File(f"static/images/{user.id}.png", filename="image.png")
+        try:
+            file = renkochart(user.id)
+            await interaction.followup.send(file=file)
+        except:
+            await interaction.followup.send("No data found", ephemeral=True)
+        
 
-        await interaction.followup.send(file=file)
+        
+        #log
+        print(f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')} | {interaction.user} used command /schedule on {user}")
         
     else:
         await interaction.response.send_message("Bad channel", ephemeral=True)

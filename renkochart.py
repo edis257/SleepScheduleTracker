@@ -3,6 +3,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.colors import ListedColormap
 import sqlite3
+import discord
 
 
 #connect to database
@@ -11,10 +12,17 @@ connection = sqlite3.connect('log_data.db')
 #function where input is user id
 def renkochart(user_id):
     # parse the data from the database
-    data_str = connection.execute("SELECT logs FROM user_logs WHERE user_id = ?", ("471777102304378890",)).fetchone()[0]
+    data_str = connection.execute("SELECT logs FROM user_logs WHERE user_id = ?", (user_id,)).fetchone()[0]
+
+    
 
 
     #data_str = "online: 2023-03-01 09:15:00,offline: 2023-03-01 23:30:00,online: 2023-03-02 08:50:00,offline: 2023-03-02 23:15:00,online: 2023-03-03 09:05:00,offline: 2023-03-03 22:45:00,online: 2023-03-04 09:20:00,offline: 2023-03-04 23:00:00,online: 2023-03-05 10:30:00,offline: 2023-03-05 14:30:00,online: 2023-03-05 19:00:00,offline: 2023-03-05 23:00:00,online: 2023-03-06 09:10:00,offline: 2023-03-06 23:10:00,online: 2023-03-07 09:30:00,offline: 2023-03-07 23:20:00,online: 2023-03-08 08:55:00,offline: 2023-03-08 23:05:00,online: 2023-03-09 09:25:00,offline: 2023-03-09 23:15:00,online: 2023-03-10 09:15:00,offline: 2023-03-10 23:00:00,online: 2023-03-11 09:05:00,offline: 2023-03-11 22:50:00,online: 2023-03-12 09:20:00,offline: 2023-03-12 22:55:00,online: 2023-03-13 09:10:00,offline: 2023-03-13 22:45:00,online: 2023-03-14 09:00:00,offline: 2023-03-14 23:00:00"
+
+    #print data_str
+    # print("####################")
+    # print(data_str)
+    # print("####################")
 
     data_list = data_str.split(",")
     datetime_list = []
@@ -64,4 +72,6 @@ def renkochart(user_id):
 
     #save the plot where name is user id
     fig.savefig(f"static/images/{user_id}.png")
+    file = discord.File(f"static/images/{user_id}.png")
+    return file
     
