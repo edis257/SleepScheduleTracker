@@ -5,8 +5,7 @@ from datetime import datetime
 from discord import app_commands
 from discord.ext import commands
 
-#import renkochart.py
-from renkochart import renkochart
+from baby import plot_user
 
 
 TOKEN = ''
@@ -86,16 +85,16 @@ async def greet(interaction: discord.Interaction, user: discord.Member):
         await interaction.response.defer() 
         #run renkochart with userid as input
         try:
-            file = renkochart(user.id)
-            await interaction.followup.send(file=file)
-        except:
-            await interaction.followup.send("No data found", ephemeral=True)
-        
 
-        
-        #log
-        print(f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')} | {interaction.user} used command /schedule on {user}")
-        
+            file = plot_user(user.id)
+            await interaction.followup.send(file=file)
+
+
+
+        except:
+
+            await interaction.followup.send("No data found", ephemeral=True)
+     
     else:
         await interaction.response.send_message("Bad channel", ephemeral=True)
 
