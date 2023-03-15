@@ -4,13 +4,20 @@ import sqlite3
 from datetime import datetime
 from discord import app_commands
 from discord.ext import commands
+import pytz
+import os
+from dotenv import load_dotenv
+
 
 from baby import plot_user
 
+load_dotenv()
 
-TOKEN = ''
+TOKEN = os.getenv('DISCORD_TOKEN')
 
 bot = commands.Bot(command_prefix="!", intents=discord.Intents.all())
+
+tz = pytz.timezone('Europe/Vilnius')
 
 # create a SQLite database
 connection = sqlite3.connect('log_data.db')
@@ -55,10 +62,12 @@ async def on_presence_update(before, after):
             user_logs = cursor.execute("SELECT logs FROM user_logs WHERE user_id = ?", (user_id,)).fetchone()
             if user_logs:
                 # if user logs already exist, append new log to the logs
-                user_logs = user_logs[0] + f",offline: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+                current_time = datetime.now(tz)
+                formatted_time = current_time.strftime("%Y-%m-%d %H:%M:%S")
+                user_logs = user_logs[0] + f",offline: {formatted_time}"
                 cursor.execute("UPDATE user_logs SET logs = ? WHERE user_id = ?", (user_logs, user_id))
                 connection.commit()
-                #print("ON2OFF_LOGS")
+                print(f"{username} went offline")
             else:
                 pass
         elif before.status == discord.Status.offline and after.status in [discord.Status.online, discord.Status.idle, discord.Status.dnd]:
@@ -66,17 +75,20 @@ async def on_presence_update(before, after):
             username = after.name
             user_logs = cursor.execute("SELECT logs FROM user_logs WHERE user_id = ?", (user_id,)).fetchone()
             if user_logs:
-                # if user logs already exist, append new log to the logs
-                user_logs = user_logs[0] + f",online: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+                current_time = datetime.now(tz)
+                formatted_time = current_time.strftime("%Y-%m-%d %H:%M:%S")
+                user_logs = user_logs[0] + f",online: {formatted_time}"
                 cursor.execute("UPDATE user_logs SET logs = ? WHERE user_id = ?", (user_logs, user_id))
                 connection.commit()
-                #print("OFF2ON_LOGS")
+                print(f"user {username} came online")
             else:
                 # if user logs do not exist, create new row for the user
-                user_logs = f"online: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+                current_time = datetime.now(tz)
+                formatted_time = current_time.strftime("%Y-%m-%d %H:%M:%S")
+                user_logs = f"online: {formatted_time}"
                 cursor.execute("INSERT INTO user_logs (user_id, username, logs) VALUES (?, ?, ?)", (user_id, username, user_logs))
                 connection.commit()
-                #print("OFF2ON_NOLOGS")
+                print(f"user {username} came online")
 
 @bot.tree.command(name="schedule")
 async def greet(interaction: discord.Interaction, user: discord.Member):
@@ -88,8 +100,8 @@ async def greet(interaction: discord.Interaction, user: discord.Member):
 
             file = plot_user(user.id)
             await interaction.followup.send(file=file)
-
-
+            #log
+            print(f"User {user.name} requested chart for {user.name} in {interaction.channel.name}")
 
         except:
 

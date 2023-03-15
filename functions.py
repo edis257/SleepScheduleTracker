@@ -2,8 +2,11 @@ import datetime
 import discord
 import pandas as pd
 from plotnine import *
+import random
 
 import re
+
+from colorsys import rgb_to_hls, hls_to_rgb
 
 
 #function that takes string and returns string
@@ -31,6 +34,16 @@ def data_pair_creator(data_list):
         if i + 1 < len(data_list) and "online" in data_list[i] and "offline" in data_list[i + 1]:
             data_pairs.append((data_list[i], data_list[i + 1]))
     return data_pairs
+
+#function that takes color and shift and returns color
+def shift_hue(color, shift):
+    r, g, b = tuple(int(color[i:i+2], 16) for i in (1, 3, 5))
+    h, l, s = rgb_to_hls(r/255, g/255, b/255)
+    h = (h + shift) % 1
+    r, g, b = tuple(round(c*255) for c in hls_to_rgb(h, l, s))
+    hexcode = "#{0:02x}{1:02x}{2:02x}".format(r, g, b)
+    return hexcode
+
 
 #function that creates plot from data
 def plot_data(data_pairs, id, username):
@@ -87,19 +100,22 @@ def plot_data(data_pairs, id, username):
 
     column_width = 250 / num_days
 
+    text_color = "#FFFFFF"
+    background_color = "#262626"
+    element_color = "#B653F2"
+    element_color = shift_hue(element_color, random.random())
+
     plot = (ggplot(aes(x="start_date"), rows)
-    + geom_segment(aes(xend="start_date", yend="end_time", y="start_time"), size=column_width, color="green")
+    + geom_segment(aes(xend="start_date", yend="end_time", y="start_time"), size=column_width, color=element_color)
     + scale_x_date(name="", date_breaks=date_breaks, date_labels=date_labels, expand=(0, 0)) 
     + scale_y_datetime(date_labels="%H:%M", expand=(0, 0, 0, 0.0001), date_breaks="1 hour")
-    + ggtitle(f"{username}'s activity schedule")
-    + theme(plot_background=element_rect(color="white"), axis_title=element_blank())
+    + ggtitle(f"{username}'s activity graph")
+    + theme(plot_background=element_rect(fill=background_color, color=background_color), panel_background=element_rect(fill=background_color), axis_title=element_blank(), text=element_text(color=text_color), panel_grid_major = element_blank(), panel_grid_minor = element_blank())
     )
-
     username = re.sub('[^0-9a-zA-Z]+', '', username)
-
 
     ggsave(plot, f"static/images/{username}_{id}.png", width=6.96, height=5.51, units="in", dpi=300)
     file = discord.File(f"static/images/{username}_{id}.png")
-    print(file)
+    #print(file)
     return file
 

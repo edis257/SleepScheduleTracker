@@ -1,6 +1,8 @@
 from functions import *
 import sqlite3
 import discord
+import pytz
+import datetime
 
 connection = sqlite3.connect('log_data.db')
 
@@ -14,16 +16,20 @@ def plot_user(user_id):
         data_str = convert(data_str)
         data_list = data_str.split(",")
         data_pairs = data_pair_creator(data_list)
-        print(data_pairs)
+        #print(data_pairs)
         file = plot_data(data_pairs, user_id, username)
 
     except:
-        #append current time to data_str
-        now = datetime.datetime.now()
-        formatted_time = now.strftime("%Y-%m-%d %H:%M:%S")  # format without milliseconds
+        tz = pytz.timezone('Europe/Vilnius')
+        current_time = datetime.datetime.now(tz)
+        formatted_time = current_time.strftime("%Y-%m-%d %H:%M:%S")
+
         data_str += f",offline: {formatted_time}"
+
         
         data_str = convert(data_str)
+
+
         data_list = data_str.split(",")
         data_pairs = data_pair_creator(data_list)
         file = plot_data(data_pairs, user_id, username)
@@ -47,6 +53,6 @@ def plot_all_users():
 
     connection.close()
 
-#plot_all_users()
+plot_all_users()
 
 
