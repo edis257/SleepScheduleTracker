@@ -8,8 +8,9 @@ import pytz
 import os
 from dotenv import load_dotenv
 
-
 from baby import plot_user
+
+
 
 load_dotenv()
 
@@ -22,14 +23,6 @@ tz = pytz.timezone('Europe/Vilnius')
 # create a SQLite database
 connection = sqlite3.connect('log_data.db')
 cursor = connection.cursor()
-
-# create a table to store user logs
-cursor.execute('''CREATE TABLE IF NOT EXISTS user_logs (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                user_id INTEGER NOT NULL,
-                username TEXT NOT NULL,
-                logs TEXT NOT NULL)''')
-connection.commit()
 
 
 #on ready event
@@ -89,6 +82,9 @@ async def on_presence_update(before, after):
                 cursor.execute("INSERT INTO user_logs (user_id, username, logs) VALUES (?, ?, ?)", (user_id, username, user_logs))
                 connection.commit()
                 print(f"user {username} came online")
+
+
+
 
 @bot.tree.command(name="schedule")
 async def greet(interaction: discord.Interaction, user: discord.Member):

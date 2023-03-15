@@ -53,6 +53,6 @@ def plot_all_users():
 
     connection.close()
 
-plot_all_users()
+#plot_all_users()
 
 
