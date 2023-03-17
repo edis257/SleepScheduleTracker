@@ -7,18 +7,22 @@ from discord.ext import commands
 import pytz
 import os
 from dotenv import load_dotenv
+from discord import Spotify
+
 
 from baby import plot_user
-
+from functions import get_last_n_records
 
 
 load_dotenv()
 
 TOKEN = os.getenv('DISCORD_TOKEN')
+interaction_channel = os.getenv('INTERACTION_CHANNEL')
 
 bot = commands.Bot(command_prefix="!", intents=discord.Intents.all())
 
 tz = pytz.timezone('Europe/Vilnius')
+
 
 # create a SQLite database
 connection = sqlite3.connect('log_data.db')
@@ -86,14 +90,52 @@ async def on_presence_update(before, after):
 
 
 
-@bot.tree.command(name="schedule")
-async def greet(interaction: discord.Interaction, user: discord.Member):
-    #if command is used in channel with id 888888888888888888
-    if interaction.channel_id == 1062174423685287976:
-        await interaction.response.defer() 
-        #run renkochart with userid as input
-        try:
+     #if activity changes
+    if before.activity != after.activity:
+        if after and after.activity and after.activity.name:
+            #log activity to database
+            user_id = str(after.id)
+            username = after.name
+            user_logs = cursor.execute("SELECT logs FROM user_activity_logs WHERE user_id = ?", (user_id,)).fetchone()
+            if user_logs:                    
+                    current_time = datetime.now(tz)
+                    formatted_time = current_time.strftime("%Y-%m-%d %H:%M:%S")
+                    #activity + date to database
+                    if after.activity.name == "Spotify":
+                        song_name = after.activity.title
+                        user_logs = user_logs[0] + f",{after.activity.name} - {song_name}: {formatted_time}"
+                    else:
+                        user_logs = user_logs[0] + f",{after.activity.name}: {formatted_time}"
+                    
+                    cursor.execute("UPDATE user_activity_logs SET logs = ? WHERE user_id = ?", (user_logs, user_id))
+                    connection.commit()
+                    #log
+                    print(f"{username} is now {after.activity.name}")
+            else:
+                #if user logs do not exist, create new row for the user
+                current_time = datetime.now(tz)
+                formatted_time = current_time.strftime("%Y-%m-%d %H:%M:%S")
+                if after.activity.name == "Spotify":
+                    song_name = after.activity.title
+                    user_logs = f"{after.activity.name} - {song_name}: {formatted_time}"
+                else:
+                    user_logs = f"{after.activity.name}: {formatted_time}"
+                cursor.execute("INSERT INTO user_activity_logs (user_id, username, logs) VALUES (?, ?, ?)", (user_id, username, user_logs))
+                connection.commit()
+                #log
+                print(f"{username} is now {after.activity.name}")
+   
+            
 
+
+
+
+@bot.tree.command(name="schedule")
+async def schedule(interaction: discord.Interaction, user: discord.Member):
+    #if channel is correct or user id is bot owner
+    if interaction.channel_id == int(interaction_channel) or interaction.user.id == 334013974704029700:
+        await interaction.response.defer() 
+        try:
             file = plot_user(user.id)
             await interaction.followup.send(file=file)
             #log
@@ -105,6 +147,81 @@ async def greet(interaction: discord.Interaction, user: discord.Member):
      
     else:
         await interaction.response.send_message("Bad channel", ephemeral=True)
+
+#command, get user's last online time
+@bot.tree.command(name="lastonline")
+async def lastonline(interaction: discord.Interaction, user: discord.Member):
+    if interaction.channel_id == int(interaction_channel) or interaction.user.id == 334013974704029700:
+        await interaction.response.defer() 
+        user_logs = cursor.execute("SELECT logs FROM user_logs WHERE user_id = ?", (user.id,)).fetchone()
+        if user_logs:
+            user_logs = user_logs[0].split(",")
+            last_online = user_logs[-1].split(": ")[1]
+            await interaction.followup.send(f"{user.name} was last online at {last_online}", ephemeral=True)
+        else:
+            await interaction.followup.send(f"{user.name} has no logs", ephemeral=True)
+    else:
+        await interaction.response.send_message("Bad channel", ephemeral=True)
+
+
+#command for dumping user_activity_logs for user
+@bot.tree.command(name="activitylog")
+async def activity(interaction: discord.Interaction, user: discord.Member, limit: int = 10):
+    if interaction.channel_id == int(interaction_channel) or interaction.user.id == 334013974704029700:
+        await interaction.response.defer() 
+        user_logs = cursor.execute("SELECT logs FROM user_activity_logs WHERE user_id = ?", (user.id,)).fetchone()
+        if user_logs:
+            user_logs = get_last_n_records(user_logs[0], limit)
+            try:
+                await interaction.followup.send(f"{user_logs}")
+            except:
+                await interaction.followup.send(f"Exceeds 2000 characters")
+        else:
+            await interaction.followup.send(f"{user.name} has no activity logs")
+    else:
+        await interaction.response.send_message("Bad channel", ephemeral=True)
+
+
+#command for dumping user_logs for user
+@bot.tree.command(name="onlinelog")
+async def activity(interaction: discord.Interaction, user: discord.Member, limit: int = 10):
+    if interaction.channel_id == int(interaction_channel) or interaction.user.id == 334013974704029700:
+        await interaction.response.defer() 
+        user_logs = cursor.execute("SELECT logs FROM user_logs WHERE user_id = ?", (user.id,)).fetchone()
+        if user_logs:
+            user_logs = get_last_n_records(user_logs[0], limit)
+            try:
+                await interaction.followup.send(f"{user_logs}")
+            except:
+                await interaction.followup.send(f"Exceeds 2000 characters")
+        else:
+            await interaction.followup.send(f"{user.name} has no activity logs")
+    else:
+        await interaction.response.send_message("Bad channel", ephemeral=True)
+
+
+#command that deletes row of user from user_logs
+@bot.tree.command(name="deletelog")
+async def deleteuser(interaction: discord.Interaction, user: discord.Member):
+    if interaction.user.id == 334013974704029700:
+        await interaction.response.defer() 
+        cursor.execute("DELETE FROM user_logs WHERE user_id = ?", (user.id,))
+        connection.commit()
+        await interaction.followup.send(f"{user.name} deleted from user_logs")
+    else:
+        await interaction.response.send_message("You dont have permission", ephemeral=True)
+
+#command that deletes row of user from user_activity_logs
+@bot.tree.command(name="deleteactivitylog")
+async def deleteuser(interaction: discord.Interaction, user: discord.Member):
+    if interaction.user.id == 334013974704029700:
+        await interaction.response.defer() 
+        cursor.execute("DELETE FROM user_activity_logs WHERE user_id = ?", (user.id,))
+        connection.commit()
+        await interaction.followup.send(f"{user.name} deleted from user_activity_logs")
+    else:
+        await interaction.response.send_message("You dont have permission", ephemeral=True)
+
 
 
 #bot run

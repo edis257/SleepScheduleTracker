@@ -10,3 +10,12 @@ cursor.execute('''CREATE TABLE IF NOT EXISTS user_logs (
                 username TEXT NOT NULL,
                 logs TEXT NOT NULL)''')
 connection.commit()
+
+# create a table to store user activity logs
+cursor.execute('''CREATE TABLE IF NOT EXISTS user_activity_logs (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                username TEXT NOT NULL,
+                logs TEXT NOT NULL)''')
+connection.commit()
+
