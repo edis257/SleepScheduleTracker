@@ -122,7 +122,7 @@ def plot_data(data_pairs, id, username):
 def get_last_n_records(records_string, n):
     records = records_string.split(',')
     if n >= len(records):
-        return records_string
+        return '\n'.join(records)
     else:
-        return ','.join(records[-n:])
+        return '\n'.join(records[-n:])
 

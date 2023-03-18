@@ -8,10 +8,12 @@ import pytz
 import os
 from dotenv import load_dotenv
 from discord import Spotify
+import tempfile
 
 
 from baby import plot_user
 from functions import get_last_n_records
+
 
 
 load_dotenv()
@@ -51,6 +53,11 @@ async def on_ready():
 # on user status change
 @bot.event
 async def on_presence_update(before, after):
+    user_id = str(after.id)
+    is_ignored = cursor.execute("SELECT 1 FROM ignored_users WHERE user_id = ?", (user_id,)).fetchone()
+    if is_ignored:
+        return
+    # Rest of the code
     # check if user goes offline or comes back online
     if before.status != after.status:       
         if before.status in [discord.Status.online, discord.Status.idle, discord.Status.dnd] and after.status == discord.Status.offline:
@@ -90,7 +97,7 @@ async def on_presence_update(before, after):
 
 
 
-     #if activity changes
+    #if activity changes
     if before.activity != after.activity:
         if after and after.activity and after.activity.name:
             #log activity to database
@@ -98,38 +105,38 @@ async def on_presence_update(before, after):
             username = after.name
             user_logs = cursor.execute("SELECT logs FROM user_activity_logs WHERE user_id = ?", (user_id,)).fetchone()
             if user_logs:                    
-                    current_time = datetime.now(tz)
-                    formatted_time = current_time.strftime("%Y-%m-%d %H:%M:%S")
-                    #activity + date to database
-                    if after.activity.name == "Spotify":
-                        song_name = after.activity.title
-                        user_logs = user_logs[0] + f",{after.activity.name} - {song_name}: {formatted_time}"
-                    else:
-                        user_logs = user_logs[0] + f",{after.activity.name}: {formatted_time}"
+                current_time = datetime.now(tz)
+                formatted_time = current_time.strftime("%Y-%m-%d %H:%M:%S")
+                #activity + date to database
+                if after.activity.name == "Spotify":
+                    song_name = after.activity.title
+                    user_logs = user_logs[0] + f",{formatted_time}: {after.activity.name} - {song_name}"
+                else:
+                    user_logs = user_logs[0] + f",{formatted_time}: {after.activity.name}"
                     
-                    cursor.execute("UPDATE user_activity_logs SET logs = ? WHERE user_id = ?", (user_logs, user_id))
-                    connection.commit()
-                    #log
-                    print(f"{username} is now {after.activity.name}")
+                cursor.execute("UPDATE user_activity_logs SET logs = ? WHERE user_id = ?", (user_logs, user_id))
+                connection.commit()
+                #log
+                print(f"{username} is now {after.activity.name}")
             else:
                 #if user logs do not exist, create new row for the user
                 current_time = datetime.now(tz)
                 formatted_time = current_time.strftime("%Y-%m-%d %H:%M:%S")
                 if after.activity.name == "Spotify":
                     song_name = after.activity.title
-                    user_logs = f"{after.activity.name} - {song_name}: {formatted_time}"
+                    user_logs = f"{formatted_time}: {after.activity.name} - {song_name}"
                 else:
-                    user_logs = f"{after.activity.name}: {formatted_time}"
+                    user_logs = f"{formatted_time}: {after.activity.name}"
                 cursor.execute("INSERT INTO user_activity_logs (user_id, username, logs) VALUES (?, ?, ?)", (user_id, username, user_logs))
                 connection.commit()
                 #log
                 print(f"{username} is now {after.activity.name}")
-   
+
             
 
 
 
-
+#1
 @bot.tree.command(name="schedule")
 async def schedule(interaction: discord.Interaction, user: discord.Member):
     #if channel is correct or user id is bot owner
@@ -148,61 +155,69 @@ async def schedule(interaction: discord.Interaction, user: discord.Member):
     else:
         await interaction.response.send_message("Bad channel", ephemeral=True)
 
-#command, get user's last online time
-@bot.tree.command(name="lastonline")
-async def lastonline(interaction: discord.Interaction, user: discord.Member):
-    if interaction.channel_id == int(interaction_channel) or interaction.user.id == 334013974704029700:
-        await interaction.response.defer() 
-        user_logs = cursor.execute("SELECT logs FROM user_logs WHERE user_id = ?", (user.id,)).fetchone()
-        if user_logs:
-            user_logs = user_logs[0].split(",")
-            last_online = user_logs[-1].split(": ")[1]
-            await interaction.followup.send(f"{user.name} was last online at {last_online}", ephemeral=True)
-        else:
-            await interaction.followup.send(f"{user.name} has no logs", ephemeral=True)
-    else:
-        await interaction.response.send_message("Bad channel", ephemeral=True)
 
-
-#command for dumping user_activity_logs for user
+#2
 @bot.tree.command(name="activitylog")
-async def activity(interaction: discord.Interaction, user: discord.Member, limit: int = 10):
+async def activity(interaction: discord.Interaction, user: discord.Member, limit: int = 100):
     if interaction.channel_id == int(interaction_channel) or interaction.user.id == 334013974704029700:
         await interaction.response.defer() 
         user_logs = cursor.execute("SELECT logs FROM user_activity_logs WHERE user_id = ?", (user.id,)).fetchone()
         if user_logs:
             user_logs = get_last_n_records(user_logs[0], limit)
+            # Create a temporary file and write the records
+            with tempfile.NamedTemporaryFile(mode='w', encoding='utf-8', delete=False) as temp_file:
+                temp_file.write(user_logs)
+                temp_path = temp_file.name
+
+            # Send the file as an attachment
             try:
-                await interaction.followup.send(f"{user_logs}")
+                with open(temp_path, 'rb') as attachment_file:
+                    attachment = discord.File(attachment_file, f"{user.name}_activity_logs.txt")
+                    await interaction.followup.send(file=attachment)
             except:
-                await interaction.followup.send(f"Exceeds 2000 characters")
+                await interaction.followup.send(f"Error sending file")
+            finally:
+                # Remove the temporary file
+                os.remove(temp_path)
         else:
             await interaction.followup.send(f"{user.name} has no activity logs")
     else:
         await interaction.response.send_message("Bad channel", ephemeral=True)
 
 
-#command for dumping user_logs for user
+
+#3
 @bot.tree.command(name="onlinelog")
-async def activity(interaction: discord.Interaction, user: discord.Member, limit: int = 10):
+async def onlinelog(interaction: discord.Interaction, user: discord.Member, limit: int = 100):
     if interaction.channel_id == int(interaction_channel) or interaction.user.id == 334013974704029700:
         await interaction.response.defer() 
         user_logs = cursor.execute("SELECT logs FROM user_logs WHERE user_id = ?", (user.id,)).fetchone()
         if user_logs:
             user_logs = get_last_n_records(user_logs[0], limit)
+            # Create a temporary file and write the records
+            with tempfile.NamedTemporaryFile(mode='w', encoding='utf-8', delete=False) as temp_file:
+                temp_file.write(user_logs)
+                temp_path = temp_file.name
+
+            # Send the file as an attachment
             try:
-                await interaction.followup.send(f"{user_logs}")
+                with open(temp_path, 'rb') as attachment_file:
+                    attachment = discord.File(attachment_file, f"{user.name}_online_logs.txt")
+                    await interaction.followup.send(file=attachment)
             except:
-                await interaction.followup.send(f"Exceeds 2000 characters")
+                await interaction.followup.send(f"Error sending file")
+            finally:
+                # Remove the temporary file
+                os.remove(temp_path)
         else:
             await interaction.followup.send(f"{user.name} has no activity logs")
     else:
         await interaction.response.send_message("Bad channel", ephemeral=True)
 
 
-#command that deletes row of user from user_logs
+#4
 @bot.tree.command(name="deletelog")
-async def deleteuser(interaction: discord.Interaction, user: discord.Member):
+async def deleteuserlog(interaction: discord.Interaction, user: discord.Member):
     if interaction.user.id == 334013974704029700:
         await interaction.response.defer() 
         cursor.execute("DELETE FROM user_logs WHERE user_id = ?", (user.id,))
@@ -211,9 +226,9 @@ async def deleteuser(interaction: discord.Interaction, user: discord.Member):
     else:
         await interaction.response.send_message("You dont have permission", ephemeral=True)
 
-#command that deletes row of user from user_activity_logs
+#5
 @bot.tree.command(name="deleteactivitylog")
-async def deleteuser(interaction: discord.Interaction, user: discord.Member):
+async def deleteuseractivitylog(interaction: discord.Interaction, user: discord.Member):
     if interaction.user.id == 334013974704029700:
         await interaction.response.defer() 
         cursor.execute("DELETE FROM user_activity_logs WHERE user_id = ?", (user.id,))
@@ -222,7 +237,22 @@ async def deleteuser(interaction: discord.Interaction, user: discord.Member):
     else:
         await interaction.response.send_message("You dont have permission", ephemeral=True)
 
-
+#6
+@bot.tree.command(name="ignoreuser")
+async def ignoreuser(interaction: discord.Interaction, user: discord.Member, action: str):
+    if interaction.user.id == 334013974704029700:
+        if action.lower() == "add":
+            cursor.execute("INSERT OR IGNORE INTO ignored_users (user_id) VALUES (?)", (str(user.id),))
+            connection.commit()
+            await interaction.response.send_message(f"{user.name} has been added to the ignore list.", ephemeral=True)
+        elif action.lower() == "remove":
+            cursor.execute("DELETE FROM ignored_users WHERE user_id = ?", (str(user.id),))
+            connection.commit()
+            await interaction.response.send_message(f"{user.name} has been removed from the ignore list.", ephemeral=True)
+        else:
+            await interaction.response.send_message("Invalid action", ephemeral=True)
+    else:
+        await interaction.response.send_message("You dont have permission", ephemeral=True)
 
 #bot run
 bot.run(TOKEN)

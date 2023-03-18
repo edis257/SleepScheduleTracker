@@ -19,3 +19,5 @@ cursor.execute('''CREATE TABLE IF NOT EXISTS user_activity_logs (
                 logs TEXT NOT NULL)''')
 connection.commit()
 
+cursor.execute("CREATE TABLE IF NOT EXISTS ignored_users (user_id TEXT PRIMARY KEY)")
+connection.commit()
