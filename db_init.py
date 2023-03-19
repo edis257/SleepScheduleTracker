@@ -1,7 +1,8 @@
 import sqlite3
+from database import get_database_connection, get_database_cursor
 
-connection = sqlite3.connect('log_data.db')
-cursor = connection.cursor()
+connection = get_database_connection()
+cursor = get_database_cursor(connection)
 
 # create a table to store user logs
 cursor.execute('''CREATE TABLE IF NOT EXISTS user_logs (

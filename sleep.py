@@ -1,35 +1,33 @@
 import discord
 from discord.ext import commands
-import sqlite3
 from datetime import datetime
-from discord import app_commands
 from discord.ext import commands
 import pytz
 import os
-from dotenv import load_dotenv
-from discord import Spotify
 import tempfile
+from discord import app_commands
+
+#how to install discord components?
+#pip install discord-components
+
+from plot import plot_user
+from functions import get_last_n_records, convert
+from leaderboard import show_leaderboard
+
+from database import get_database_connection, get_database_cursor
 
 
-from baby import plot_user
-from functions import get_last_n_records
 
-
-
-load_dotenv()
+connection = get_database_connection()
+cursor = get_database_cursor(connection)
 
 TOKEN = os.getenv('DISCORD_TOKEN')
-interaction_channel = os.getenv('INTERACTION_CHANNEL')
+interaction_channel = int(os.getenv('INTERACTION_CHANNEL'))
+interaction_id = int(os.getenv('INTERACTION_ID'))
 
 bot = commands.Bot(command_prefix="!", intents=discord.Intents.all())
 
 tz = pytz.timezone('Europe/Vilnius')
-
-
-# create a SQLite database
-connection = sqlite3.connect('log_data.db')
-cursor = connection.cursor()
-
 
 #on ready event
 @bot.event
@@ -132,21 +130,19 @@ async def on_presence_update(before, after):
                 #log
                 print(f"{username} is now {after.activity.name}")
 
-            
-
-
 
 #1
-@bot.tree.command(name="schedule")
+@bot.tree.command(name="graph", description="Get the activity graph for a user")
+@app_commands.describe(user="User to get graph for")
 async def schedule(interaction: discord.Interaction, user: discord.Member):
     #if channel is correct or user id is bot owner
-    if interaction.channel_id == int(interaction_channel) or interaction.user.id == 334013974704029700:
+    if interaction.channel_id == int(interaction_channel) or interaction.user.id == interaction_id:
         await interaction.response.defer() 
         try:
             file = plot_user(user.id)
             await interaction.followup.send(file=file)
             #log
-            print(f"User {user.name} requested chart for {user.name} in {interaction.channel.name}")
+            print(f"User {interaction.user} requested chart for {user.name} in {interaction.channel.name}")
 
         except:
 
@@ -157,9 +153,10 @@ async def schedule(interaction: discord.Interaction, user: discord.Member):
 
 
 #2
-@bot.tree.command(name="activitylog")
+@bot.tree.command(name="activitylog", description="Get the activity log for a user")
+@app_commands.describe(user="User to get logs for", limit="Number of logs to get (default 100)")
 async def activity(interaction: discord.Interaction, user: discord.Member, limit: int = 100):
-    if interaction.channel_id == int(interaction_channel) or interaction.user.id == 334013974704029700:
+    if interaction.channel_id == int(interaction_channel) or interaction.user.id == interaction_id:
         await interaction.response.defer() 
         user_logs = cursor.execute("SELECT logs FROM user_activity_logs WHERE user_id = ?", (user.id,)).fetchone()
         if user_logs:
@@ -187,11 +184,16 @@ async def activity(interaction: discord.Interaction, user: discord.Member, limit
 
 
 #3
-@bot.tree.command(name="onlinelog")
+@bot.tree.command(name="onlinelog", description="Get online logs for a user")
+@app_commands.describe(user="User to get logs for", limit="Number of logs to get (default 100)")
 async def onlinelog(interaction: discord.Interaction, user: discord.Member, limit: int = 100):
-    if interaction.channel_id == int(interaction_channel) or interaction.user.id == 334013974704029700:
+    if interaction.channel_id == int(interaction_channel) or interaction.user.id == interaction_id:
         await interaction.response.defer() 
         user_logs = cursor.execute("SELECT logs FROM user_logs WHERE user_id = ?", (user.id,)).fetchone()
+        print(user_logs)
+        #print t
+        #user_logs = convert(user_logs[0])
+        #print(user_logs)
         if user_logs:
             user_logs = get_last_n_records(user_logs[0], limit)
             # Create a temporary file and write the records
@@ -218,7 +220,7 @@ async def onlinelog(interaction: discord.Interaction, user: discord.Member, limi
 #4
 @bot.tree.command(name="deletelog")
 async def deleteuserlog(interaction: discord.Interaction, user: discord.Member):
-    if interaction.user.id == 334013974704029700:
+    if interaction.user.id == interaction_id:
         await interaction.response.defer() 
         cursor.execute("DELETE FROM user_logs WHERE user_id = ?", (user.id,))
         connection.commit()
@@ -229,7 +231,7 @@ async def deleteuserlog(interaction: discord.Interaction, user: discord.Member):
 #5
 @bot.tree.command(name="deleteactivitylog")
 async def deleteuseractivitylog(interaction: discord.Interaction, user: discord.Member):
-    if interaction.user.id == 334013974704029700:
+    if interaction.user.id == interaction_id:
         await interaction.response.defer() 
         cursor.execute("DELETE FROM user_activity_logs WHERE user_id = ?", (user.id,))
         connection.commit()
@@ -240,7 +242,7 @@ async def deleteuseractivitylog(interaction: discord.Interaction, user: discord.
 #6
 @bot.tree.command(name="ignoreuser")
 async def ignoreuser(interaction: discord.Interaction, user: discord.Member, action: str):
-    if interaction.user.id == 334013974704029700:
+    if interaction.user.id == interaction_id:
         if action.lower() == "add":
             cursor.execute("INSERT OR IGNORE INTO ignored_users (user_id) VALUES (?)", (str(user.id),))
             connection.commit()
@@ -253,6 +255,27 @@ async def ignoreuser(interaction: discord.Interaction, user: discord.Member, act
             await interaction.response.send_message("Invalid action", ephemeral=True)
     else:
         await interaction.response.send_message("You dont have permission", ephemeral=True)
+
+
+#7
+@bot.tree.command(name="leaderboard", description="Show online total leaderboard of current month")
+@app_commands.describe(limit="The number of users to show")
+async def showleaderboard(interaction: discord.Interaction, limit: int = 10):
+    leaderboard = show_leaderboard(limit)
+
+    embed = discord.Embed(title="Leaderboard", description="Top users by online time", color=0x42F56C)
+
+    leaderboard_content = ""
+    for index, username, online_time in leaderboard:
+        line = f"{index}. {username.ljust(20)} {online_time}\n"
+        # Check if adding the line would exceed the character limit
+        if len(leaderboard_content) + len(line) > 6000:  # The max limit for embeds is 6000 characters, not 2000
+            break
+        leaderboard_content += line
+
+    embed.description = f"```{leaderboard_content}```"
+
+    await interaction.response.send_message(embed=embed)
 
 #bot run
 bot.run(TOKEN)
